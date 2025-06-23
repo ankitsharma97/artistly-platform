@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Search, Filter, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,8 +17,37 @@ interface ArtistFiltersProps {
   resultsCount: number
 }
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 export function ArtistFilters({ filters, onFiltersChange, resultsCount }: ArtistFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [searchValue, setSearchValue] = useState(filters.searchQuery)
+
+  // Debounce the search value
+  const debouncedSearchValue = useDebounce(searchValue, 300)
+
+  // Update search query when debounced value changes
+  useEffect(() => {
+    onFiltersChange({
+      ...filters,
+      searchQuery: debouncedSearchValue,
+    })
+  }, [debouncedSearchValue])
 
   const handleCategoryChange = (category: string, checked: boolean) => {
     const newCategories = checked ? [...filters.category, category] : filters.category.filter((c) => c !== category)
@@ -43,14 +72,12 @@ export function ArtistFilters({ filters, onFiltersChange, resultsCount }: Artist
     })
   }
 
-  const handleSearchChange = (searchQuery: string) => {
-    onFiltersChange({
-      ...filters,
-      searchQuery,
-    })
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value)
   }
 
   const clearFilters = () => {
+    setSearchValue("")
     onFiltersChange({
       category: [],
       location: "",
@@ -59,7 +86,7 @@ export function ArtistFilters({ filters, onFiltersChange, resultsCount }: Artist
     })
   }
 
-  const hasActiveFilters = filters.category.length > 0 || filters.location || filters.priceRange
+  const hasActiveFilters = filters.category.length > 0 || filters.location || filters.priceRange || filters.searchQuery
 
   const FilterContent = () => (
     <div className="space-y-4 sm:space-y-6">
@@ -73,11 +100,16 @@ export function ArtistFilters({ filters, onFiltersChange, resultsCount }: Artist
           <Input
             id="search"
             placeholder="Search by name, bio, or category..."
-            value={filters.searchQuery}
+            value={searchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10 h-10 sm:h-11 text-sm"
           />
         </div>
+        {searchValue && (
+          <p className="text-xs text-gray-500 mt-1">
+            Search will update automatically as you type
+          </p>
+        )}
       </div>
 
       {/* Categories */}
@@ -167,7 +199,7 @@ export function ArtistFilters({ filters, onFiltersChange, resultsCount }: Artist
                 Filters
                 {hasActiveFilters && (
                   <span className="ml-1 sm:ml-2 bg-blue-600 text-white text-xs rounded-full px-1.5 sm:px-2 py-0.5">
-                    {filters.category.length + (filters.location ? 1 : 0) + (filters.priceRange ? 1 : 0)}
+                    {filters.category.length + (filters.location ? 1 : 0) + (filters.priceRange ? 1 : 0) + (filters.searchQuery ? 1 : 0)}
                   </span>
                 )}
               </Button>
